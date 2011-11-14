@@ -10,10 +10,14 @@ object ReleaseKeys {
   lazy val releaseVersion = SettingKey[String => String]("release-release-version")
   lazy val nextVersion = SettingKey[String => String]("release-next-version")
   lazy val tagName = SettingKey[String]("release-tag-name")
+  lazy val versionControlSystem = SettingKey[String]("release-vcs")
 
   lazy val versions = AttributeKey[Versions]("release-versions")
   lazy val useDefaults = AttributeKey[Boolean]("release-use-defaults")
   lazy val skipTests = AttributeKey[Boolean]("release-skip-tests")
+
+
+  lazy val versionControlSystemClass = AttributeKey[VCS]("release-vcsClass")
 
   private lazy val releaseCommandKey = "release"
   private val WithDefaults = "with-defaults"
@@ -46,10 +50,12 @@ object Release {
     nextVersion := { ver => Version(ver).map(_.bumpMinor.asSnapshot.string).getOrElse(versionFormatError) },
 
     tagName <<= (version in ThisBuild) (v => "v" + v),
+    versionControlSystem := "Git",
 
     releaseProcess <<= thisProjectRef apply { ref =>
       import ReleaseStateTransformations._
       Seq[ReleasePart](
+        initialVCSSetup,
         initialGitChecks,
         checkSnapshotDependencies,
         inquireVersions,
@@ -59,7 +65,8 @@ object Release {
         tagRelease,
         releaseTask(publish in Global in ref),
         setNextVersion,
-        commitNextVersion
+        commitNextVersion,
+        pushVersionChanges
       )
     },
 

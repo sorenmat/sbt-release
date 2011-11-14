@@ -9,15 +9,27 @@ object ReleaseStateTransformations {
   import ReleaseKeys._
   import Utilities._
 
-  lazy val initialGitChecks: ReleasePart = { st =>
-    if (!new File(".git").exists) {
-      sys.error("Aborting release. Working directory is not a git repository.")
+  val initialVCSSetup: ReleasePart = { st =>
+    val extracted = Project.extract(st)
+    val vcs = st.extract.get(versionControlSystem)
+
+    vcs.toLowerCase match {
+      case "git" => VersionControlSystem.vcs = Git
+      case "hg" => VersionControlSystem.vcs = Mercurial
+      case _ => VersionControlSystem.vcs =Git
     }
-    val status = (Git.status !!).trim
+    st
+  }
+
+  lazy val initialGitChecks: ReleasePart = { st =>
+    if (!new File(VersionControlSystem.vcs.getVCSIdentifierName).exists && !new File("../"+VersionControlSystem.vcs.getVCSIdentifierName).exists) {
+      sys.error("Aborting release. Working directory is not a "+VersionControlSystem.vcs.VCSName+" repository.")
+    }
+    val status = (VersionControlSystem.vcs.status !!).trim
     if (!status.isEmpty) {
       sys.error("Aborting release. Working directory is dirty.")
     }
-    st.logger.info("Starting release process off git commit: " + Git.currentHash)
+    st.logger.info("Starting release process off "+VersionControlSystem.vcs.VCSName+" commit: " + VersionControlSystem.vcs.currentHash)
     st
   }
 
@@ -89,16 +101,29 @@ object ReleaseStateTransformations {
     val newState = commitVersion("Releasing %s")(st)
     reapply(Seq[Setting[_]](
       packageOptions += ManifestAttributes(
-        "Git-Release-Hash" -> Git.currentHash
+        "Git-Release-Hash" -> VersionControlSystem.vcs.currentHash
       )
     ), newState)
   }
+
+  lazy val pushVersionChanges: ReleasePart = { st =>
+    VersionControlSystem.vcs.pushTags
+    st
+  }
+
   lazy val commitNextVersion: ReleasePart = commitVersion("Bump to %s")
+
   private def commitVersion(msgPattern: String): ReleasePart = { st =>
     val v = st.extract.get(version in ThisBuild)
 
-    Git.add("version.sbt") !! st.logger
-    Git.commit(msgPattern format v) !! st.logger
+    val status = (VersionControlSystem.vcs.isTracked("version.sbt")  !!).trim
+    if (status.isEmpty) {
+      st.logger.info("version.sbt not found in repository adding it")
+      VersionControlSystem.vcs.add("version.sbt") !! st.logger
+      VersionControlSystem.vcs.commit(msgPattern format v) !! st.logger
+    } else if(VersionControlSystem.vcs.isModified("version.sbt")) {
+      VersionControlSystem.vcs.commit(msgPattern format v) !! st.logger
+    }
 
     st
   }
@@ -106,7 +131,7 @@ object ReleaseStateTransformations {
   lazy val tagRelease: ReleasePart = { st =>
     val tag = st.extract.get(tagName)
 
-    Git.tag(tag) !! st.logger
+    VersionControlSystem.vcs.tag(tag) !! st.logger
 
     reapply(Seq[Setting[_]](
       packageOptions += ManifestAttributes("Git-Release-Tag" -> tag)

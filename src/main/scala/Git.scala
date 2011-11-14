@@ -2,22 +2,26 @@ package sbtrelease
 
 import sbt._
 
-object Git {
+object Git extends VCS {
   import Utilities._
 
-  private lazy val gitExec = {
+   def getExec = {
     val maybeOsName = sys.props.get("os.name").map(_.toLowerCase)
     val maybeIsWindows = maybeOsName.filter(_.contains("windows"))
     maybeIsWindows.map(_ => "git.exe").getOrElse("git")
   }
 
-  private def cmd(args: Any*): ProcessBuilder = Process(gitExec +: args.map(_.toString))
+  def getVCSIdentifierName = ".git"
+
+  def VCSName = "Git"
+
+  private def cmd(args: Any*): ProcessBuilder = Process(getExec +: args.map(_.toString))
 
   def trackingBranch: String = (cmd("for-each-ref", "--format=%(upstream:short)", "refs/heads/" + currentBranch) !!) trim
 
   def currentBranch = (cmd("name-rev", "HEAD", "--name-only") !!) trim
 
-  def currentHash = (cmd("rev-parse", "HEAD") !!) trim
+  def currentHash = (cmd("rev-parse", "HEAD") !!).trim
 
   def add(files: String*) = cmd(("add" +: files): _*)
 
@@ -28,6 +32,10 @@ object Git {
   def pushTags = cmd("push", "--tags")
 
   def status = cmd("status", "--porcelain")
+
+  def isTracked(file: String) = cmd("status", "--all", "-I", file) // TODO fix me
+
+  def isModified(file: String) = true
 
   def pushCurrentBranch = {
     val localBranch = currentBranch

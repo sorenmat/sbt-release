@@ -13,6 +13,9 @@ object Version {
   }
 }
 
+object VersionControlSystem {
+  var vcs: VCS = Git
+}
 case class Version(major: Int, minor: Option[Int], bugfix: Option[Int], qualifier: Option[String]) {
   def bump = {
     val maybeBumpedBugfix = bugfix.map(m => copy(bugfix = Some(m + 1)))
