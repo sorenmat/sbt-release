@@ -1,12 +1,8 @@
-import sbtrelease.Release._
-
-seq(releaseSettings: _*)
-
 organization := "com.github.gseitz"
 
 name := "sbt-release"
 
-version := "0.3"
+version := "0.4"
 
 sbtPlugin := true
 
