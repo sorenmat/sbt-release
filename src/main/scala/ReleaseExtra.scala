@@ -111,6 +111,7 @@ object ReleaseStateTransformations {
   }
 
   lazy val pushVersionChanges: ReleasePart = { st =>
+    st.logger.info("Pushing to default location")
     VersionControlSystem.vcs.pushTags
     st
   }
